@@ -1,20 +1,40 @@
 <script lang="ts">
   import type { Exam, Mode, Question } from '../lib/types';
+  import { untrack } from 'svelte';
   import QuestionCard from '../components/QuestionCard.svelte';
   import TranslationPanel from '../components/TranslationPanel.svelte';
   import ProgressBar from '../components/ProgressBar.svelte';
-  import { recordAnswer } from '../lib/progress';
+  import { recordAnswer, appendLastWrong, lastWrongKey } from '../lib/progress';
+  import { saveSession } from '../lib/session';
 
-  let { queue, mode, exam, onFinish, onCancel } = $props<{
-    queue: Question[]; mode: Mode; exam: Exam;
+  let {
+    queue, mode, exam, category,
+    initialIndex = 0, initialAnswers = {},
+    onFinish, onCancel,
+  } = $props<{
+    queue: Question[]; mode: Mode; exam: Exam; category?: string;
+    initialIndex?: number;
+    initialAnswers?: Record<string, boolean>;
     onFinish: (answers: Record<string, boolean>) => void;
     onCancel: () => void;
   }>();
 
-  let index = $state(0);
+  // One-shot seed from props on mount — this component owns these from here on.
+  let index = $state(untrack(() => initialIndex));
   let revealed = $state(false);
   let displayOrder = $state<number[]>([0, 1, 2, 3]);
-  let answers = $state<Record<string, boolean>>({});
+  let answers = $state<Record<string, boolean>>(untrack(() => ({ ...initialAnswers })));
+
+  // Persist a compact snapshot on every index/answers change so a refresh resumes
+  // mid-run. Queue is stored as IDs; App.svelte rehydrates to Question[] via getQuestion.
+  $effect(() => {
+    saveSession({
+      mode, exam, category,
+      queueIds: queue.map((q: Question) => q.id),
+      index,
+      answers: { ...answers },
+    });
+  });
   // safe: guarded by queue.length > 0 check in template
   const current = $derived(queue[index]!);
 
@@ -23,6 +43,9 @@
     displayOrder = outcome.displayOrder;
     answers[current.id] = outcome.correct;
     if (!current.isNavigationTask) recordAnswer(current.id, outcome.correct);
+    if (!outcome.correct && mode === 'sequential' && category) {
+      appendLastWrong(lastWrongKey(exam, category), current.id);
+    }
   }
 
   function onNavAck() {
@@ -48,7 +71,7 @@
     <article class="nav-task">
       <h2>Frage {current.officialNumber} — Navigationsaufgabe</h2>
       <p>{current.de.question}</p>
-      {#if current.image}<img src={current.image} alt="Chart {current.officialNumber}" />{/if}
+      {#if current.image}<img src={`${import.meta.env.BASE_URL}${current.image}`} alt="Chart {current.officialNumber}" />{/if}
       <div class="official-answer">
         <h3>Offizielle Lösung</h3>
         <p>{current.de.answers[current.correctIndex]}</p>

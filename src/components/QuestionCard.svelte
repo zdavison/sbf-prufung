@@ -27,7 +27,7 @@
   <h2>Frage {question.officialNumber}</h2>
   <p class="question">{question.de.question}</p>
   {#if question.image}
-    <img src={question.image} alt="Diagramm Frage {question.officialNumber}" />
+    <img src={`${import.meta.env.BASE_URL}${question.image}`} alt="Diagramm Frage {question.officialNumber}" />
   {/if}
   <ol class="answers">
     {#each displayOrder as origIdx}

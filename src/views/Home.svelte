@@ -1,16 +1,20 @@
 <script lang="ts">
   import type { Exam, Mode, Question } from '../lib/types';
-  import { byExam, allCategories } from '../lib/data';
+  import { byExam, allCategories, getQuestion } from '../lib/data';
   import { shuffle } from '../lib/shuffle';
   import { buildSimulation } from '../lib/simulation';
+  import { getLastWrong, resetLastWrong, lastWrongKey } from '../lib/progress';
 
   let { onStart, onWeak } = $props<{
-    onStart: (exam: Exam, mode: Mode, queue: Question[]) => void;
+    onStart: (exam: Exam, mode: Mode, queue: Question[], category?: string) => void;
     onWeak: () => void;
   }>();
 
   let exam = $state<Exam>('binnen');
   let category = $state<string>('');
+  // A bump forces wrongIdsForCategory to re-read localStorage after we mutate it
+  // here (exam/category alone don't change on reset).
+  let readTick = $state(0);
 
   $effect(() => {
     exam; // track exam changes
@@ -18,12 +22,31 @@
   });
 
   const categories = $derived(allCategories(exam));
+  const wrongIdsForCategory = $derived.by(() => {
+    readTick;
+    return category ? getLastWrong(lastWrongKey(exam, category)) : [];
+  });
 
   function startSequential() {
     const queue = category
       ? byExam(exam).filter(q => q.category === category)
       : byExam(exam);
-    onStart(exam, 'sequential', queue);
+    if (category) {
+      resetLastWrong(lastWrongKey(exam, category));
+      readTick++;
+    }
+    onStart(exam, 'sequential', queue, category || undefined);
+  }
+  function startRedoWrong() {
+    if (!category || wrongIdsForCategory.length === 0) return;
+    const queue = wrongIdsForCategory
+      .map(id => getQuestion(id))
+      .filter((q): q is Question => !!q);
+    // The redo run itself resets the bucket so the user can iteratively narrow
+    // down on the stubborn ones.
+    resetLastWrong(lastWrongKey(exam, category));
+    readTick++;
+    onStart(exam, 'sequential', queue, category);
   }
   function startShuffle() { onStart(exam, 'shuffle', shuffle(byExam(exam))); }
   function startSimulation() { onStart(exam, 'simulation', buildSimulation(exam)); }
@@ -52,7 +75,14 @@
       {/each}
     </select>
   </label>
-  <button onclick={startSequential}>Start</button>
+  <div class="row">
+    <button onclick={startSequential}>Start</button>
+    {#if category && wrongIdsForCategory.length > 0}
+      <button class="secondary" onclick={startRedoWrong}>
+        Redo {wrongIdsForCategory.length} wrong from last run
+      </button>
+    {/if}
+  </div>
 </section>
 
 <section class="panel">
@@ -88,4 +118,10 @@
     margin-top: 0.75rem;
   }
   label { display: block; margin-bottom: 0.5rem; }
+  .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  button.secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
 </style>
