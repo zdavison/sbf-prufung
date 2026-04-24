@@ -77,4 +77,6 @@ async function main() {
   process.stderr.write('Done.\n');
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(err => { console.error(err); process.exit(1); });
+}

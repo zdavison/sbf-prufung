@@ -17,7 +17,7 @@ function examOf(q: RawQuestion): BuiltQuestion['exam'] {
 
 function translate(s: string, cache: Cache, overrides: Overrides): string {
   const h = sha1(s);
-  if (overrides[h]) return overrides[h];
+  if (h in overrides) return overrides[h]!;
   const hit = cache[h];
   if (!hit) throw new Error(`Missing translation for string: "${s.slice(0, 60)}..." (hash ${h})`);
   return hit.en;

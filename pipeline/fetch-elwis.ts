@@ -8,7 +8,7 @@ const SOURCES = {
   see: 'https://www.elwis.de/DE/Sportschifffahrt/Sportbootfuehrerscheine/Fragenkataloge/SBF-See/SBF-See-node.html',
 } as const;
 
-async function fetchHtml(url: string): Promise<string> {
+export async function fetchHtml(url: string): Promise<string> {
   const res = await request(url, { headers: { 'user-agent': 'sbf-prufung-pipeline/0.1 (local tool)' } });
   if (res.statusCode !== 200) throw new Error(`GET ${url} returned ${res.statusCode}`);
   return await res.body.text();
@@ -28,4 +28,6 @@ async function main() {
   process.stderr.write(`Wrote data/raw-parsed.json (${all.length} questions)\n`);
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(err => { console.error(err); process.exit(1); });
+}
