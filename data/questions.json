@@ -1,0 +1,102 @@
+[
+  {
+    "id": "basis-1",
+    "exam": "basis",
+    "category": "Allgemeines",
+    "officialNumber": 1,
+    "correctIndex": 0,
+    "de": {
+      "question": "Was bedeutet das Zeichen \"Einfahrt verboten\"?",
+      "answers": [
+        "Das Befahren der Wasserstraße ist verboten.",
+        "Es darf nur mit Sondererlaubnis eingefahren werden.",
+        "Die Wasserstraße ist gesperrt.",
+        "Nur Motorboote dürfen einfahren."
+      ]
+    },
+    "en": {
+      "question": "What does the sign \"Entry forbidden\" mean?",
+      "answers": [
+        "Using the waterway is prohibited.",
+        "Entry is only permitted with special authorization.",
+        "The waterway is closed.",
+        "Only motorboats may enter."
+      ]
+    }
+  },
+  {
+    "id": "basis-2",
+    "exam": "basis",
+    "category": "Allgemeines",
+    "officialNumber": 2,
+    "correctIndex": 0,
+    "de": {
+      "question": "Was versteht man unter Backbord?",
+      "answers": [
+        "Die linke Seite des Fahrzeugs in Fahrtrichtung.",
+        "Die rechte Seite des Fahrzeugs in Fahrtrichtung.",
+        "Das Heck des Fahrzeugs.",
+        "Den Bug des Fahrzeugs."
+      ]
+    },
+    "en": {
+      "question": "What is meant by port?",
+      "answers": [
+        "The left side of the vessel in the direction of travel.",
+        "The right side of the vessel in the direction of travel.",
+        "The stern of the vessel.",
+        "The bow of the vessel."
+      ]
+    }
+  },
+  {
+    "id": "binnen-73",
+    "exam": "binnen",
+    "category": "Fahrzeugführung",
+    "officialNumber": 73,
+    "correctIndex": 0,
+    "de": {
+      "question": "Was bedeutet ein langer Ton als Schallsignal?",
+      "answers": [
+        "Ein Ton von 4 bis 6 Sekunden Dauer.",
+        "Ein Ton von 1 bis 2 Sekunden Dauer.",
+        "Ein Ton von mehr als 6 Sekunden Dauer.",
+        "Ein Ton von weniger als 1 Sekunde Dauer."
+      ]
+    },
+    "en": {
+      "question": "What does one prolonged blast mean as a sound signal?",
+      "answers": [
+        "A blast of 4 to 6 seconds duration.",
+        "A blast of 1 to 2 seconds duration.",
+        "A blast of more than 6 seconds duration.",
+        "A blast of less than 1 second duration."
+      ]
+    }
+  },
+  {
+    "id": "see-73",
+    "exam": "see",
+    "category": "Seefahrt",
+    "officialNumber": 73,
+    "correctIndex": 0,
+    "de": {
+      "question": "Welche Lichter führt ein Segelfahrzeug unter 7 m Länge bei Nacht?",
+      "answers": [
+        "Eine elektrische Laterne mit weißem, grünem und rotem Licht.",
+        "Nur ein weißes Rundumlicht.",
+        "Toplicht und Seitenlichter.",
+        "Topplicht, Seitenlichter und Hecklicht."
+      ]
+    },
+    "en": {
+      "question": "What lights does a sailing vessel under 7m length show at night?",
+      "answers": [
+        "An electric lantern combining white, green and red lights.",
+        "Only a white all-round light.",
+        "Masthead light and sidelights.",
+        "Masthead light, sidelights and sternlight."
+      ]
+    }
+  }
+]
