@@ -1,12 +1,20 @@
 # SBF Exam Translator Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Read `HANDOFF.md` at the repo root first** — it explains the current progress, sandbox constraints, and which tasks need pre-staged artifacts.
 
 **Goal:** Ship a static Svelte site that quizzes the user on German SBF-Binnen and SBF-See exam questions and reveals English translations only after each question is answered, with a Node/TS data pipeline that scrapes, translates, and bundles the official ELWIS catalog.
 
 **Architecture:** Two decoupled pieces in one repo. The pipeline (`pipeline/*.ts`) is run manually; it produces `data/questions.json` + `public/assets/questions/*.png` which are committed. The Svelte app imports `data/questions.json` at build time and stores progress in `localStorage`. GitHub Actions builds the site and deploys `dist/` to GitHub Pages on every push to `main`.
 
 **Tech Stack:** Node.js 20+, TypeScript (strict), Vite 5, Svelte 5 (runes), Vitest, undici, cheerio, `@anthropic-ai/sdk` (model `claude-opus-4-7`), GitHub Pages / GitHub Actions.
+
+## Progress
+
+- [x] Task 0: Project scaffolding — committed as `72c407b`
+- [x] Task 1: Pipeline shared types — committed as `0b7dfed`
+- [ ] Task 2–17: pending
+
+See `HANDOFF.md` for sandbox execution notes before picking up Task 2.
 
 ---
 
