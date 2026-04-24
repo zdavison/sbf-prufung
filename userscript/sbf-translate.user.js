@@ -5,7 +5,7 @@
 // @connect      raw.githubusercontent.com
 // @grant        GM_xmlhttpRequest
 // @run-at       document-idle
-// @version      0.1.0
+// @version      0.2.0
 // @description  Hover translations for SBF quiz questions, sourced from ELWIS data.
 // ==/UserScript==
 
@@ -15,12 +15,13 @@
   const DATA_URL = 'https://raw.githubusercontent.com/zdavison/sbf-prufung/main/data/questions.json';
   const HOVER_DELAY_MS = 500;
   const CURSOR_OFFSET = 12;
+  const MIN_TEXT_LEN = 5;
+  const MAX_TEXT_LEN = 500;
   const JACCARD_THRESHOLD = 0.85;
   const LEVENSHTEIN_THRESHOLD = 0.9;
   const LENGTH_DIFF_CUTOFF = 0.3;
 
-  const questionMap = new Map();
-  const answerMap = new Map();
+  // ---- Normalization & matching ----
 
   function normalize(text) {
     return text
@@ -30,26 +31,7 @@
       .replace(/[.?!:;]+$/, '');
   }
 
-  function buildMaps(data) {
-    for (const item of data) {
-      if (item?.de?.question && item?.en?.question) {
-        questionMap.set(normalize(item.de.question), item.en.question);
-      }
-      const deAnswers = item?.de?.answers;
-      const enAnswers = item?.en?.answers;
-      if (Array.isArray(deAnswers) && Array.isArray(enAnswers)) {
-        for (let i = 0; i < deAnswers.length && i < enAnswers.length; i++) {
-          if (deAnswers[i] && enAnswers[i]) {
-            answerMap.set(normalize(deAnswers[i]), enAnswers[i]);
-          }
-        }
-      }
-    }
-  }
-
-  function tokenize(s) {
-    return s.split(' ').filter(Boolean);
-  }
+  function tokenize(s) { return s.split(' ').filter(Boolean); }
 
   function jaccard(a, b) {
     const A = new Set(tokenize(a));
@@ -79,86 +61,108 @@
     return prev[n];
   }
 
-  function levenshteinRatio(a, b) {
-    const maxLen = Math.max(a.length, b.length);
-    if (maxLen === 0) return 1;
-    return 1 - levenshtein(a, b) / maxLen;
-  }
-
   function findInMap(normText, map) {
     const direct = map.get(normText);
     if (direct) return direct;
-    let best = null;
-    let bestScore = 0;
     const len = normText.length;
+    let best = null, bestScore = 0, bestKey = null;
     for (const [key, value] of map) {
-      if (Math.abs(key.length - len) / Math.max(key.length, len) > LENGTH_DIFF_CUTOFF) continue;
+      const keyLen = key.length;
+      if (Math.abs(keyLen - len) / Math.max(keyLen, len) > LENGTH_DIFF_CUTOFF) continue;
       const j = jaccard(normText, key);
       if (j >= JACCARD_THRESHOLD && j > bestScore) {
-        best = value;
-        bestScore = j;
-        continue;
+        best = value; bestScore = j; bestKey = key;
       }
-      if (j < JACCARD_THRESHOLD) {
-        const r = levenshteinRatio(normText, key);
-        if (r >= LEVENSHTEIN_THRESHOLD && r > bestScore) {
-          best = value;
-          bestScore = r;
-        }
+    }
+    if (best) return best;
+    // Levenshtein fallback over length-compatible entries
+    for (const [key, value] of map) {
+      const keyLen = key.length;
+      if (Math.abs(keyLen - len) / Math.max(keyLen, len) > LENGTH_DIFF_CUTOFF) continue;
+      const r = 1 - levenshtein(normText, key) / Math.max(keyLen, len);
+      if (r >= LEVENSHTEIN_THRESHOLD && r > bestScore) {
+        best = value; bestScore = r; bestKey = key;
       }
     }
     return best;
   }
 
-  function lookup(text) {
+  function lookup(text, maps) {
     const norm = normalize(text);
     if (!norm) return null;
-    return findInMap(norm, questionMap) || findInMap(norm, answerMap);
+    return findInMap(norm, maps.questionMap) || findInMap(norm, maps.answerMap);
   }
 
-  // An element is a "leaf text block" if it has non-empty trimmed text and no
-  // descendant block-level element that itself carries text.
-  const BLOCK_TAGS = new Set([
-    'DIV', 'P', 'LI', 'UL', 'OL', 'SECTION', 'ARTICLE', 'MAIN', 'ASIDE',
-    'HEADER', 'FOOTER', 'NAV', 'FORM', 'TABLE', 'TR', 'TD', 'TH', 'TBODY',
-    'THEAD', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'FIGURE', 'BLOCKQUOTE'
-  ]);
+  // ---- Lazy data loading ----
 
-  function isLeafTextBlock(el) {
-    const text = el.textContent;
-    if (!text || !text.trim()) return false;
-    for (const child of el.children) {
-      if (BLOCK_TAGS.has(child.tagName) && child.textContent && child.textContent.trim()) {
-        return false;
-      }
+  let dataPromise = null;
+
+  function fetchJSON(url) {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url,
+        onload: (res) => {
+          if (res.status >= 200 && res.status < 300) {
+            try { resolve(JSON.parse(res.responseText)); }
+            catch (e) { reject(e); }
+          } else {
+            reject(new Error('HTTP ' + res.status));
+          }
+        },
+        onerror: (err) => reject(err),
+        ontimeout: () => reject(new Error('timeout'))
+      });
+    });
+  }
+
+  function getMaps() {
+    if (!dataPromise) {
+      dataPromise = fetchJSON(DATA_URL).then((data) => {
+        const questionMap = new Map();
+        const answerMap = new Map();
+        for (const item of data) {
+          if (item?.de?.question && item?.en?.question) {
+            questionMap.set(normalize(item.de.question), item.en.question);
+          }
+          const de = item?.de?.answers, en = item?.en?.answers;
+          if (Array.isArray(de) && Array.isArray(en)) {
+            for (let i = 0; i < de.length && i < en.length; i++) {
+              if (de[i] && en[i]) answerMap.set(normalize(de[i]), en[i]);
+            }
+          }
+        }
+        return { questionMap, answerMap };
+      }).catch((err) => {
+        console.warn('[SBF Translator] failed to load translations', err);
+        dataPromise = null;
+        throw err;
+      });
     }
-    return true;
+    return dataPromise;
   }
 
-  function processElement(el) {
-    if (el.dataset.sbfMatched) return;
-    if (!isLeafTextBlock(el)) return;
-    const translation = lookup(el.textContent);
-    el.dataset.sbfMatched = '1';
-    if (!translation) return;
-    el.dataset.sbfTranslation = translation;
-    attachHover(el);
+  // ---- Element targeting on hover ----
+
+  // Walk up from target to find the nearest ancestor whose trimmed text is a
+  // plausible question/answer (length in range and not gigantic wrappers).
+  function findCandidate(start) {
+    let el = start;
+    while (el && el !== document.body && el instanceof Element) {
+      if (tooltipEl && (el === tooltipEl || tooltipEl.contains(el))) return null;
+      const text = el.textContent ? el.textContent.trim() : '';
+      if (text.length >= MIN_TEXT_LEN && text.length <= MAX_TEXT_LEN) return el;
+      if (text.length > MAX_TEXT_LEN) return null; // went past — ancestor is a big container
+      el = el.parentElement;
+    }
+    return null;
   }
 
-  function walk(root) {
-    if (!(root instanceof Element)) return;
-    if (root.matches('script, style, noscript')) return;
-    processElement(root);
-    // Descend even if matched — children can still be their own leaves above.
-    for (const child of root.children) walk(child);
-  }
+  const lookupCache = new WeakMap(); // Element -> string | null
 
   // ---- Tooltip ----
 
   let tooltipEl = null;
-  let activeEl = null;
-  let showTimer = null;
-  let moveHandler = null;
 
   function ensureTooltip() {
     if (tooltipEl) return tooltipEl;
@@ -197,9 +201,9 @@
     tt.style.top = y + 'px';
   }
 
-  function showTooltip(el, clientX, clientY) {
+  function showTooltip(text, clientX, clientY) {
     const tt = ensureTooltip();
-    tt.textContent = el.dataset.sbfTranslation || '';
+    tt.textContent = text;
     tt.style.display = 'block';
     positionTooltip(clientX, clientY);
   }
@@ -208,68 +212,55 @@
     if (tooltipEl) tooltipEl.style.display = 'none';
   }
 
-  function attachHover(el) {
-    el.addEventListener('mouseenter', (e) => {
-      activeEl = el;
-      clearTimeout(showTimer);
-      const { clientX, clientY } = e;
-      let lastX = clientX, lastY = clientY;
-      moveHandler = (ev) => { lastX = ev.clientX; lastY = ev.clientY; positionTooltip(lastX, lastY); };
-      el.addEventListener('mousemove', moveHandler);
-      showTimer = setTimeout(() => {
-        if (activeEl === el) showTooltip(el, lastX, lastY);
-      }, HOVER_DELAY_MS);
-    });
-    el.addEventListener('mouseleave', () => {
-      if (activeEl === el) activeEl = null;
-      clearTimeout(showTimer);
-      if (moveHandler) {
-        el.removeEventListener('mousemove', moveHandler);
-        moveHandler = null;
-      }
-      hideTooltip();
-    });
-  }
+  // ---- Hover state machine ----
 
-  // ---- Observer ----
+  let hoveredEl = null;
+  let hoverTimer = null;
+  let lastX = 0, lastY = 0;
 
-  function startObserver() {
-    const obs = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        for (const node of m.addedNodes) {
-          if (node instanceof Element) walk(node);
+  function onMouseOver(e) {
+    const candidate = findCandidate(e.target);
+    if (!candidate) return;
+    if (candidate === hoveredEl) return;
+    hoveredEl = candidate;
+    clearTimeout(hoverTimer);
+    hideTooltip();
+    lastX = e.clientX; lastY = e.clientY;
+    hoverTimer = setTimeout(async () => {
+      if (hoveredEl !== candidate) return;
+      let translation = lookupCache.get(candidate);
+      if (translation === undefined) {
+        try {
+          const maps = await getMaps();
+          translation = lookup(candidate.textContent, maps) || null;
+        } catch {
+          translation = null;
         }
+        lookupCache.set(candidate, translation);
       }
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
+      if (translation && hoveredEl === candidate) {
+        showTooltip(translation, lastX, lastY);
+      }
+    }, HOVER_DELAY_MS);
   }
 
-  // ---- Bootstrap ----
-
-  function fetchJSON(url) {
-    return new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({
-        method: 'GET',
-        url,
-        onload: (res) => {
-          if (res.status >= 200 && res.status < 300) {
-            try { resolve(JSON.parse(res.responseText)); }
-            catch (e) { reject(e); }
-          } else {
-            reject(new Error('HTTP ' + res.status));
-          }
-        },
-        onerror: (err) => reject(err),
-        ontimeout: () => reject(new Error('timeout'))
-      });
-    });
+  function onMouseOut(e) {
+    // relatedTarget is the element the pointer moved INTO; if it's still
+    // inside the current candidate, ignore (mouseout bubbles from children).
+    if (hoveredEl && e.relatedTarget instanceof Node && hoveredEl.contains(e.relatedTarget)) return;
+    hoveredEl = null;
+    clearTimeout(hoverTimer);
+    hideTooltip();
   }
 
-  fetchJSON(DATA_URL).then((data) => {
-    buildMaps(data);
-    walk(document.body);
-    startObserver();
-  }).catch((err) => {
-    console.warn('[SBF Translator] failed to load translations', err);
-  });
+  function onMouseMove(e) {
+    lastX = e.clientX; lastY = e.clientY;
+    if (tooltipEl && tooltipEl.style.display === 'block') {
+      positionTooltip(lastX, lastY);
+    }
+  }
+
+  document.addEventListener('mouseover', onMouseOver, true);
+  document.addEventListener('mouseout', onMouseOut, true);
+  document.addEventListener('mousemove', onMouseMove, true);
 })();
