@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { sha1 } from './hash';
 import type { RawQuestion } from './types';
 
-const MODEL = 'claude-opus-4-7';
+const MODEL = 'claude-haiku-4-5-20251001';
 const CACHE_PATH = 'data/translations-cache.json';
 const BATCH_SIZE = 20;
 

@@ -4,6 +4,8 @@
 
 **Goal:** Ship a static Svelte site that quizzes the user on German SBF-Binnen and SBF-See exam questions and reveals English translations only after each question is answered, with a Node/TS data pipeline that scrapes, translates, and bundles the official ELWIS catalog.
 
+> **Scope note (2026-04-24):** initial build targets **SBF-Binnen only**. SBF-See remains in the type system and pipeline scaffolding (commented-out `SOURCES` entries in Task 3, `'see'` kept in the `Exam` union) so it can be enabled later by uncommenting and staging fixtures. The site **must degrade gracefully** when `data/questions.json` contains zero `exam: 'see'` entries — the Home view hides the See option based on `hasExam('see')`. See Task 7 and Task 10 for the implementation.
+
 **Architecture:** Two decoupled pieces in one repo. The pipeline (`pipeline/*.ts`) is run manually; it produces `data/questions.json` + `public/assets/questions/*.png` which are committed. The Svelte app imports `data/questions.json` at build time and stores progress in `localStorage`. GitHub Actions builds the site and deploys `dist/` to GitHub Pages on every push to `main`.
 
 **Tech Stack:** Node.js 20+, TypeScript (strict), Vite 5, Svelte 5 (runes), Vitest, undici, cheerio, `@anthropic-ai/sdk` (model `claude-opus-4-7`), GitHub Pages / GitHub Actions.
@@ -331,18 +333,28 @@ git commit -m "feat(pipeline): shared types"
 The parser is a pure function `parseElwisHtml(html, exam)` that returns `RawQuestion[]`. We develop it against a saved HTML fixture so tests are deterministic and don't hit the network.
 
 **Files:**
-- Create: `pipeline/__fixtures__/elwis-binnen.html`, `pipeline/__fixtures__/elwis-see.html`, `pipeline/parse-elwis.ts`, `pipeline/parse-elwis.test.ts`
+- Create: `pipeline/parse-elwis.ts`, `pipeline/parse-elwis.test.ts`
+- Pre-staged (fetched outside the sandbox): `pipeline/__fixtures__/elwis-basisfragen.html`, `pipeline/__fixtures__/elwis-binnen.html`, `pipeline/__fixtures__/elwis-segeln.html` — and equivalents for SBF-See once URLs are confirmed.
+
+> **ELWIS taxonomy note.** Each SBF exam is split across several catalog sub-pages, not a single page:
+> - **SBF-Binnen (300 Qs total):** Basisfragen 1–72 · Binnen-specific 73–253 · Sailing (Segeln) 254–300 — one URL each, all under `/Fragenkatalog-Binnen/`.
+> - **SBF-See (300 Qs total):** Basisfragen 1–72 · See-specific 73–285 · Navigation tasks 286–300 — URLs TBD (user to provide; likely parallel structure under `/Fragenkatalog-See/`).
+>
+> Basisfragen 1–72 appear on their own page for each exam and are textually identical across both; dedup runs in Task 5.
 
 - [ ] **Step 1: Capture real ELWIS fixtures**
 
-Manually browse to the ELWIS SBF question catalog pages (Binnen and See) and save the full rendered HTML to:
+For each exam, save the full rendered HTML of every sub-page to `pipeline/__fixtures__/`. SBF-Binnen URLs (live, confirmed):
 
-- `pipeline/__fixtures__/elwis-binnen.html`
-- `pipeline/__fixtures__/elwis-see.html`
+- `elwis-basisfragen.html` ← `https://www.elwis.de/DE/Sportschifffahrt/Sportbootfuehrerscheine/Fragenkatalog-Binnen/Basisfragen/Basisfragen-node.html`
+- `elwis-binnen.html` ← `https://www.elwis.de/DE/Sportschifffahrt/Sportbootfuehrerscheine/Fragenkatalog-Binnen/Spezifische-Fragen-Binnen/Spezifische-Fragen-Binnen-node.html`
+- `elwis-segeln.html` ← `https://www.elwis.de/DE/Sportschifffahrt/Sportbootfuehrerscheine/Fragenkatalog-Binnen/Spezifische-Fragen-Segeln/Spezifische-Fragen-Segeln-node.html`
 
-Inspect the DOM (e.g., open the file in a browser or use `cheerio` in a Node REPL) to identify the repeating question structure. Note down:
+SBF-See fixtures (`elwis-see-basisfragen.html`, `elwis-see.html`, `elwis-navigationsaufgaben.html`) follow the same pattern; filenames are fixed in advance so the code below compiles against them even before the HTML is staged.
 
-- Selector(s) that yield one node per question.
+Inspect the DOM (e.g., open a file in a browser or use `cheerio` in a Node REPL) to identify the repeating question structure. Note down:
+
+- Selector(s) that yield one node per question. (First pass: each question's answer block is an `<ol class="elwisOL-lowerLiteral">` — use the nearest preceding text node for the German question and the ordered-list number.)
 - Where the official number, category heading, question text, and answer list live.
 - Where images are referenced (`<img src>` or a link).
 
@@ -350,40 +362,49 @@ Record findings at the top of `parse-elwis.ts` as a short `// DOM map:` comment 
 
 - [ ] **Step 2: Write the first failing test**
 
-Create `pipeline/parse-elwis.test.ts`:
+Create `pipeline/parse-elwis.test.ts`. The parser is called once per sub-page (not once per exam); the fetcher in Task 3 is responsible for concatenating and tagging nav-tasks.
 
 ```ts
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseElwisHtml } from './parse-elwis';
 
+let basisHtml: string;
 let binnenHtml: string;
-let seeHtml: string;
+let segelnHtml: string;
 
 beforeAll(() => {
+  basisHtml = readFileSync('pipeline/__fixtures__/elwis-basisfragen.html', 'utf8');
   binnenHtml = readFileSync('pipeline/__fixtures__/elwis-binnen.html', 'utf8');
-  seeHtml = readFileSync('pipeline/__fixtures__/elwis-see.html', 'utf8');
+  segelnHtml = readFileSync('pipeline/__fixtures__/elwis-segeln.html', 'utf8');
 });
 
 describe('parseElwisHtml', () => {
-  it('returns 300 questions for Binnen', () => {
-    const qs = parseElwisHtml(binnenHtml, 'binnen');
-    expect(qs).toHaveLength(300);
+  it('returns 72 questions numbered 1..72 for the Basisfragen sub-page', () => {
+    const qs = parseElwisHtml(basisHtml, 'basis');
+    expect(qs).toHaveLength(72);
+    expect(qs.map(q => q.officialNumber)).toEqual(Array.from({ length: 72 }, (_, i) => i + 1));
+    for (const q of qs) expect(q.exam).toBe('basis');
   });
 
-  it('returns 300 questions for See', () => {
-    const qs = parseElwisHtml(seeHtml, 'see');
-    expect(qs).toHaveLength(300);
+  it('returns 181 questions numbered 73..253 for the Binnen-specific sub-page', () => {
+    const qs = parseElwisHtml(binnenHtml, 'binnen');
+    expect(qs).toHaveLength(181);
+    expect(qs[0].officialNumber).toBe(73);
+    expect(qs.at(-1)!.officialNumber).toBe(253);
   });
 
-  it('assigns officialNumber 1..300 in order', () => {
-    const qs = parseElwisHtml(binnenHtml, 'binnen');
-    expect(qs.map(q => q.officialNumber)).toEqual(Array.from({ length: 300 }, (_, i) => i + 1));
+  it('returns 47 questions numbered 254..300 for the Segeln sub-page (tagged as binnen)', () => {
+    const qs = parseElwisHtml(segelnHtml, 'binnen');
+    expect(qs).toHaveLength(47);
+    expect(qs[0].officialNumber).toBe(254);
+    expect(qs.at(-1)!.officialNumber).toBe(300);
   });
 
   it('every question has exactly 4 answers', () => {
-    const qs = parseElwisHtml(binnenHtml, 'binnen');
-    for (const q of qs) expect(q.answers).toHaveLength(4);
+    for (const qs of [parseElwisHtml(basisHtml, 'basis'), parseElwisHtml(binnenHtml, 'binnen'), parseElwisHtml(segelnHtml, 'binnen')]) {
+      for (const q of qs) expect(q.answers).toHaveLength(4);
+    }
   });
 
   it('correctIndex is 0 for every question (first answer is correct per ELWIS convention)', () => {
@@ -391,12 +412,9 @@ describe('parseElwisHtml', () => {
     for (const q of qs) expect(q.correctIndex).toBe(0);
   });
 
-  it('flags navigation tasks for See 286-300', () => {
-    const qs = parseElwisHtml(seeHtml, 'see');
-    for (const q of qs) {
-      const expected = q.officialNumber >= 286 && q.officialNumber <= 300;
-      expect(q.isNavigationTask).toBe(expected);
-    }
+  it('does not set isNavigationTask (the fetcher adds that post-parse)', () => {
+    const qs = parseElwisHtml(binnenHtml, 'binnen');
+    for (const q of qs) expect(q.isNavigationTask).toBeUndefined();
   });
 
   it('extracts image URLs when present', () => {
@@ -410,6 +428,8 @@ describe('parseElwisHtml', () => {
 });
 ```
 
+> When SBF-See fixtures are staged, add parallel assertions: 72 basis, 213 see-specific (73–285), 15 nav tasks (286–300).
+
 - [ ] **Step 3: Run test to confirm it fails**
 
 Run: `npm test -- parse-elwis`
@@ -417,7 +437,7 @@ Expected: FAIL — `parse-elwis` module does not exist.
 
 - [ ] **Step 4: Implement `parseElwisHtml`**
 
-Create `pipeline/parse-elwis.ts`. Use `cheerio` to load the HTML, iterate the question nodes (selectors from Step 1), extract category from the nearest preceding heading, and emit `RawQuestion`.
+Create `pipeline/parse-elwis.ts`. Use `cheerio` to load the HTML, iterate the question nodes (selectors from Step 1), extract category from the nearest preceding heading, and emit `RawQuestion`. The parser is deliberately dumb about navigation tasks — the fetcher (Task 3) decides which sub-page is nav-tasks and sets `isNavigationTask` post-parse.
 
 ```ts
 import * as cheerio from 'cheerio';
@@ -444,7 +464,6 @@ export function parseElwisHtml(html: string, exam: Exam): RawQuestion[] {
     const questionText = $el.find('.question-body > p').first().text().trim();
     const answers = $el.find('ol > li').map((_, li) => $(li).text().trim()).get();
     const imageRef = $el.find('.question-body img').attr('src');
-    const isNavigationTask = exam === 'see' && officialNumber >= 286 && officialNumber <= 300;
 
     if (!Number.isFinite(officialNumber) || !questionText || answers.length !== 4) {
       throw new Error(
@@ -461,7 +480,6 @@ export function parseElwisHtml(html: string, exam: Exam): RawQuestion[] {
       answers,
       correctIndex: 0,
       imageRef: imageRef ? new URL(imageRef, 'https://www.elwis.de/').toString() : undefined,
-      isNavigationTask,
     });
   });
 
@@ -475,7 +493,7 @@ export function parseElwisHtml(html: string, exam: Exam): RawQuestion[] {
 
 Run: `npm test -- parse-elwis`
 
-Expected after iteration: PASS (all 7 tests).
+Expected after iteration: PASS (all 7 tests against the three SBF-Binnen fixtures).
 
 - [ ] **Step 6: Commit**
 
@@ -493,18 +511,29 @@ git commit -m "feat(pipeline): parse ELWIS HTML into RawQuestion[]"
 
 - [ ] **Step 1: Write the fetcher**
 
-Create `pipeline/fetch-elwis.ts`:
+Create `pipeline/fetch-elwis.ts`. Each exam is assembled from several ELWIS sub-pages; the fetcher downloads each, parses it with the appropriate `exam` tag, and tags nav-tasks post-parse.
 
 ```ts
 import { request } from 'undici';
 import { writeFileSync } from 'node:fs';
 import { parseElwisHtml } from './parse-elwis';
-import type { RawQuestion } from './types';
+import type { Exam, RawQuestion } from './types';
 
-const SOURCES = {
-  binnen: 'https://www.elwis.de/DE/Sportschifffahrt/Sportbootfuehrerscheine/Fragenkataloge/SBF-Binnen/SBF-Binnen-node.html',
-  see: 'https://www.elwis.de/DE/Sportschifffahrt/Sportbootfuehrerscheine/Fragenkataloge/SBF-See/SBF-See-node.html',
-} as const;
+type SubPage = { url: string; exam: Exam; isNavigationTask?: boolean; label: string };
+
+const BASE = 'https://www.elwis.de/DE/Sportschifffahrt/Sportbootfuehrerscheine';
+
+const SOURCES: SubPage[] = [
+  // SBF-Binnen (300 Qs = 72 + 181 + 47)
+  { url: `${BASE}/Fragenkatalog-Binnen/Basisfragen/Basisfragen-node.html`, exam: 'basis', label: 'SBF-Binnen basisfragen' },
+  { url: `${BASE}/Fragenkatalog-Binnen/Spezifische-Fragen-Binnen/Spezifische-Fragen-Binnen-node.html`, exam: 'binnen', label: 'SBF-Binnen binnen-specific' },
+  { url: `${BASE}/Fragenkatalog-Binnen/Spezifische-Fragen-Segeln/Spezifische-Fragen-Segeln-node.html`, exam: 'binnen', label: 'SBF-Binnen segeln (254-300)' },
+
+  // SBF-See (300 Qs = 72 + 213 + 15). URLs TBD — user to confirm the /Fragenkatalog-See/ paths.
+  // { url: `${BASE}/Fragenkatalog-See/Basisfragen/Basisfragen-node.html`, exam: 'basis', label: 'SBF-See basisfragen' },
+  // { url: `${BASE}/Fragenkatalog-See/Spezifische-Fragen-See/Spezifische-Fragen-See-node.html`, exam: 'see', label: 'SBF-See see-specific' },
+  // { url: `${BASE}/Fragenkatalog-See/Navigationsaufgaben/Navigationsaufgaben-node.html`, exam: 'see', isNavigationTask: true, label: 'SBF-See nav tasks' },
+];
 
 async function fetchHtml(url: string): Promise<string> {
   const res = await request(url, { headers: { 'user-agent': 'sbf-prufung-pipeline/0.1 (local tool)' } });
@@ -514,12 +543,13 @@ async function fetchHtml(url: string): Promise<string> {
 
 async function main() {
   const all: RawQuestion[] = [];
-  for (const [exam, url] of Object.entries(SOURCES)) {
-    process.stderr.write(`Fetching ${exam}... `);
-    const html = await fetchHtml(url);
-    const parsed = parseElwisHtml(html, exam as 'binnen' | 'see');
-    process.stderr.write(`${parsed.length} questions\n`);
-    all.push(...parsed);
+  for (const src of SOURCES) {
+    process.stderr.write(`Fetching ${src.label}... `);
+    const html = await fetchHtml(src.url);
+    const parsed = parseElwisHtml(html, src.exam);
+    const tagged = src.isNavigationTask ? parsed.map(q => ({ ...q, isNavigationTask: true })) : parsed;
+    process.stderr.write(`${tagged.length} questions\n`);
+    all.push(...tagged);
   }
   writeFileSync('data/raw-parsed.json', JSON.stringify(all, null, 2));
   process.stderr.write(`Wrote data/raw-parsed.json (${all.length} questions)\n`);
@@ -535,9 +565,9 @@ mkdir -p data
 npm run pipeline:fetch
 ```
 
-Expected: stderr prints `Fetching binnen... 300 questions`, `Fetching see... 300 questions`, `data/raw-parsed.json` is written (~600 entries).
+Expected: stderr prints a `Fetching <label>... N questions` line per sub-page; totals are 72 + 181 + 47 = 300 for SBF-Binnen, and (once uncommented) 72 + 213 + 15 = 300 for SBF-See. `data/raw-parsed.json` contains 300 entries when only SBF-Binnen is wired up, 600 with both exams.
 
-If it fails because the live HTML differs from the fixtures, re-capture fixtures (Task 2 Step 1) and fix the parser. Do not lower the 300-count assertion in tests — if the catalog version changes, update the spec first.
+If it fails because the live HTML differs from the fixtures, re-capture fixtures (Task 2 Step 1) and fix the parser. Do not lower the count assertions — if the catalog version changes, update the spec first.
 
 - [ ] **Step 3: Commit fetcher + first snapshot**
 
@@ -999,7 +1029,7 @@ vi.mock('../../data/questions.json', () => ({
   ] satisfies Question[],
 }));
 
-import { byExam, byCategory, getQuestion, allCategories } from './data';
+import { byExam, byCategory, getQuestion, allCategories, hasExam } from './data';
 
 describe('data helpers', () => {
   it('byExam("binnen") returns basis + binnen questions, in officialNumber order', () => {
@@ -1021,6 +1051,31 @@ describe('data helpers', () => {
   });
   it('allCategories returns deduped list for an exam', () => {
     expect(allCategories('binnen')).toEqual(['A', 'B']);
+  });
+  it('hasExam is true only when the exam has specific questions in the dataset', () => {
+    expect(hasExam('binnen')).toBe(true);
+    expect(hasExam('see')).toBe(true);
+  });
+});
+
+// Graceful-degradation test: when the dataset has no SBF-See questions, hasExam('see') must be false
+// so the UI can hide the option. Uses an isolated mock via vi.resetModules.
+describe('data helpers — SBF-See not yet in the dataset', () => {
+  it('hasExam("see") returns false when no see-tagged questions exist', async () => {
+    vi.resetModules();
+    vi.doMock('../../data/questions.json', () => ({
+      default: [
+        { id: 'basis-1', exam: 'basis', category: 'A', officialNumber: 1, correctIndex: 0,
+          de: { question: 'dq1', answers: ['d1','d2','d3','d4'] },
+          en: { question: 'eq1', answers: ['e1','e2','e3','e4'] } },
+        { id: 'binnen-73', exam: 'binnen', category: 'B', officialNumber: 73, correctIndex: 0,
+          de: { question: 'dq2', answers: ['d1','d2','d3','d4'] },
+          en: { question: 'eq2', answers: ['e1','e2','e3','e4'] } },
+      ] satisfies Question[],
+    }));
+    const { hasExam: hasExamIsolated } = await import('./data');
+    expect(hasExamIsolated('binnen')).toBe(true);
+    expect(hasExamIsolated('see')).toBe(false);
   });
 });
 ```
@@ -1061,6 +1116,12 @@ export function getQuestion(id: string): Question | undefined {
 
 export function allQuestions(): Question[] {
   return all;
+}
+
+// Graceful degradation: the dataset may or may not contain SBF-See questions yet.
+// Home.svelte uses this to decide whether to offer the See option.
+export function hasExam(exam: Exam): boolean {
+  return all.some(q => q.exam === exam);
 }
 ```
 
@@ -1414,7 +1475,7 @@ Create `src/views/Home.svelte`:
 ```svelte
 <script lang="ts">
   import type { Exam, Mode, Question } from '../lib/types';
-  import { byExam, allCategories } from '../lib/data';
+  import { byExam, allCategories, hasExam } from '../lib/data';
   import { shuffle } from '../lib/shuffle';
   import { buildSimulation } from '../lib/simulation';
 
@@ -1423,7 +1484,12 @@ Create `src/views/Home.svelte`:
     onWeak: () => void;
   }>();
 
-  let exam = $state<Exam>('binnen');
+  // Gracefully hide exams that aren't in the dataset yet (SBF-See is wired through the
+  // type system but the catalog is added later). The filter runs once against static data.
+  const EXAM_LABELS: Record<Exam, string> = { binnen: 'SBF-Binnen', see: 'SBF-See' };
+  const availableExams: Exam[] = (['binnen', 'see'] as const).filter(hasExam);
+
+  let exam = $state<Exam>(availableExams[0] ?? 'binnen');
   let category = $state<string>('');
 
   const categories = $derived(allCategories(exam));
@@ -1440,15 +1506,20 @@ Create `src/views/Home.svelte`:
 
 <h1>SBF Prüfung Trainer</h1>
 
-<section class="panel">
-  <label>
-    Exam:
-    <select bind:value={exam}>
-      <option value="binnen">SBF-Binnen</option>
-      <option value="see">SBF-See</option>
-    </select>
-  </label>
-</section>
+{#if availableExams.length > 1}
+  <section class="panel">
+    <label>
+      Exam:
+      <select bind:value={exam}>
+        {#each availableExams as e}
+          <option value={e}>{EXAM_LABELS[e]}</option>
+        {/each}
+      </select>
+    </label>
+  </section>
+{:else}
+  <p class="exam-hint">{EXAM_LABELS[exam]}</p>
+{/if}
 
 <section class="panel">
   <h2>Sequential by category</h2>
@@ -1497,8 +1568,11 @@ Create `src/views/Home.svelte`:
     margin-top: 0.75rem;
   }
   label { display: block; margin-bottom: 0.5rem; }
+  .exam-hint { color: #666; margin-bottom: 1rem; }
 </style>
 ```
+
+> **SBF-See degradation.** `availableExams` is computed from `hasExam(...)` so the See option only appears once the pipeline produces See-tagged questions. When only SBF-Binnen is in the dataset the picker collapses to a single-line hint; all downstream modes (sequential / shuffle / simulation / weak) operate on Binnen alone and no See-shaped queue is ever constructed. No runtime errors if `data/questions.json` has zero See entries.
 
 - [ ] **Step 3: Stub the remaining views so the app compiles**
 
@@ -1546,7 +1620,7 @@ Create `src/views/WeakQuestions.svelte`:
 
 - [ ] **Step 4: Run dev server and click through Home**
 
-Run: `npm run dev`, open the URL, verify you can pick an exam, pick a category, and click "Start" — it should navigate to the `QuestionView` stub and back.
+Run: `npm run dev`, open the URL, verify you can pick an exam (or see the single-exam hint if only SBF-Binnen is in the dataset), pick a category, and click "Start" — it should navigate to the `QuestionView` stub and back.
 
 Then: `npm run typecheck`
 Expected: no errors.

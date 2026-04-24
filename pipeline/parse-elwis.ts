@@ -1,61 +1,80 @@
 import * as cheerio from 'cheerio';
 import type { Exam, RawQuestion } from './types';
 
-// DOM map (placeholder — tune these against real ELWIS HTML once fixtures are committed):
-//   Each question: div.row.frage or similar container
-//   Official number: first element with question number text
-//   Category heading: h2 or h3 preceding a group of questions
-//   Question body text: p inside the question container
-//   Answers: li elements in an ol or ul inside the question container
-//   Images: img inside the question container
-// These selectors are GUESSES. Run npm test -- parse-elwis after adding fixtures to verify.
+// DOM map (ELWIS Fragenkatalog pages, 2023 catalog):
+//   Each question is a <p> whose first non-whitespace token is "<number>. <question text>".
+//   The question's 4 answers live in the immediately-following <ol class="elwisOL-lowerLiteral">
+//   with exactly 4 <li> children.
+//   An image, if any, lives in a <p class="picture ..."> between the question <p> and the <ol>
+//   (or inside the question <p> itself). It contains <img src="..." /> with an absolute URL.
+//   No in-page section headings — each sub-page (Basisfragen / Spezifische-Binnen / Spezifische-Segeln)
+//   is a single category. We use the page's <h1 class="isFirstInSlot"> text as the category.
+
+function cleanText(input: string): string {
+  return input
+    .replace(/ /g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 export function parseElwisHtml(html: string, exam: Exam): RawQuestion[] {
   const $ = cheerio.load(html);
+  const category = cleanText($('h1.isFirstInSlot').first().text()) || '';
   const questions: RawQuestion[] = [];
-  let currentCategory = '';
 
-  $('h2, h3, .frage, .question, [class*="frage"], [class*="question"]').each((_, el) => {
-    const $el = $(el);
-    const tagName = el.type === 'tag' ? el.name : '';
+  $('ol.elwisOL-lowerLiteral').each((_, ol) => {
+    const $ol = $(ol);
+    const answers = $ol.children('li').map((_, li) => cleanText($(li).text())).get();
+    if (answers.length !== 4) return;
 
-    if (tagName === 'h2' || tagName === 'h3') {
-      const text = $el.text().trim();
-      if (text) currentCategory = text;
-      return;
+    // Walk backwards through preceding siblings to find the question <p> (the one starting
+    // with "N. "), collecting any intermediate <img> tags as the question image.
+    let imageRef: string | undefined;
+    let officialNumber: number | undefined;
+    let questionText: string | undefined;
+
+    let $prev = $ol.prev();
+    const maxLookback = 8;
+    for (let i = 0; i < maxLookback && $prev.length; i++) {
+      const $img = $prev.find('img').first();
+      if (!imageRef && $img.length) {
+        const src = $img.attr('src');
+        if (src) imageRef = new URL(src.replace(/&amp;/g, '&'), 'https://www.elwis.de/').toString();
+      }
+      const text = cleanText($prev.text());
+      const m = text.match(/^(\d{1,3})\.\s+(.+)$/);
+      if (m) {
+        officialNumber = parseInt(m[1]!, 10);
+        questionText = m[2]!.trim();
+        // Also check for image inside the question <p> itself.
+        if (!imageRef) {
+          const $innerImg = $prev.find('img').first();
+          if ($innerImg.length) {
+            const src = $innerImg.attr('src');
+            if (src) imageRef = new URL(src.replace(/&amp;/g, '&'), 'https://www.elwis.de/').toString();
+          }
+        }
+        break;
+      }
+      $prev = $prev.prev();
     }
 
-    const fullText = $el.text();
-    const numberMatch = fullText.match(/^(\d+)[.\s]/);
-    if (!numberMatch) return;
-    const officialNumber = parseInt(numberMatch[1]!, 10);
-    if (officialNumber < 1 || officialNumber > 300) return;
-
-    const questionText = $el.find('p').first().text().trim() || fullText.split('\n')[1]?.trim() || '';
-    const answers = $el.find('li').map((_, li) => $(li).text().trim()).get().filter(Boolean);
-    const imgSrc = $el.find('img').attr('src');
-
-    if (!questionText || answers.length !== 4) {
-      process.stderr.write(
-        `parse-elwis: skipping question node officialNumber=${officialNumber} ` +
-        `(${answers.length} answers, questionText="${questionText.slice(0, 40)}")\n`
-      );
-      return;
-    }
-
-    const isNavigationTask = exam === 'see' && officialNumber >= 286 && officialNumber <= 300;
+    if (officialNumber === undefined || !questionText) return;
 
     questions.push({
       exam,
       officialNumber,
-      category: currentCategory,
+      category,
       question: questionText,
       answers,
       correctIndex: 0,
-      imageRef: imgSrc ? new URL(imgSrc, 'https://www.elwis.de/').toString() : undefined,
-      isNavigationTask,
+      imageRef,
+      isNavigationTask: false,
     });
   });
 
-  return questions;
+  // De-duplicate by officialNumber (in case a page repeats markup) and sort.
+  const byNum = new Map<number, RawQuestion>();
+  for (const q of questions) if (!byNum.has(q.officialNumber)) byNum.set(q.officialNumber, q);
+  return [...byNum.values()].sort((a, b) => a.officialNumber - b.officialNumber);
 }

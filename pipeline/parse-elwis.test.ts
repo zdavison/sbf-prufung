@@ -1,56 +1,59 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { parseElwisHtml } from './parse-elwis';
 
-let binnenHtml: string = '';
-let seeHtml: string = '';
-let fixturesAvailable = false;
+const B = 'pipeline/__fixtures__/elwis-basisfragen.html';
+const BI = 'pipeline/__fixtures__/elwis-binnen.html';
+const S = 'pipeline/__fixtures__/elwis-segeln.html';
+const fixturesAvailable = existsSync(B) && existsSync(BI) && existsSync(S);
 
-beforeAll(() => {
-  const binnenPath = 'pipeline/__fixtures__/elwis-binnen.html';
-  const seePath = 'pipeline/__fixtures__/elwis-see.html';
-  if (existsSync(binnenPath) && existsSync(seePath)) {
-    binnenHtml = readFileSync(binnenPath, 'utf8');
-    seeHtml = readFileSync(seePath, 'utf8');
-    fixturesAvailable = true;
-  }
-});
+const basisHtml = fixturesAvailable ? readFileSync(B, 'utf8') : '';
+const binnenHtml = fixturesAvailable ? readFileSync(BI, 'utf8') : '';
+const segelnHtml = fixturesAvailable ? readFileSync(S, 'utf8') : '';
 
-describe('parseElwisHtml', () => {
-  it.skipIf(() => !fixturesAvailable)('returns 300 questions for Binnen', () => {
+describe.skipIf(!fixturesAvailable)('parseElwisHtml', () => {
+  it('returns 72 questions numbered 1..72 for the Basisfragen sub-page', () => {
+    const qs = parseElwisHtml(basisHtml, 'basis');
+    expect(qs).toHaveLength(72);
+    expect(qs.map(q => q.officialNumber)).toEqual(Array.from({ length: 72 }, (_, i) => i + 1));
+    for (const q of qs) expect(q.exam).toBe('basis');
+  });
+
+  it('returns 181 questions numbered 73..253 for the Binnen-specific sub-page', () => {
     const qs = parseElwisHtml(binnenHtml, 'binnen');
-    expect(qs).toHaveLength(300);
+    expect(qs).toHaveLength(181);
+    expect(qs[0]!.officialNumber).toBe(73);
+    expect(qs.at(-1)!.officialNumber).toBe(253);
   });
 
-  it.skipIf(() => !fixturesAvailable)('returns 300 questions for See', () => {
-    const qs = parseElwisHtml(seeHtml, 'see');
-    expect(qs).toHaveLength(300);
+  it('returns 47 questions numbered 254..300 for the Segeln sub-page (tagged as binnen)', () => {
+    const qs = parseElwisHtml(segelnHtml, 'binnen');
+    expect(qs).toHaveLength(47);
+    expect(qs[0]!.officialNumber).toBe(254);
+    expect(qs.at(-1)!.officialNumber).toBe(300);
   });
 
-  it.skipIf(() => !fixturesAvailable)('assigns officialNumber 1..300 in order', () => {
-    const qs = parseElwisHtml(binnenHtml, 'binnen');
-    expect(qs.map(q => q.officialNumber)).toEqual(Array.from({ length: 300 }, (_, i) => i + 1));
+  it('every question has exactly 4 answers', () => {
+    for (const qs of [
+      parseElwisHtml(basisHtml, 'basis'),
+      parseElwisHtml(binnenHtml, 'binnen'),
+      parseElwisHtml(segelnHtml, 'binnen'),
+    ]) {
+      for (const q of qs) expect(q.answers).toHaveLength(4);
+    }
   });
 
-  it.skipIf(() => !fixturesAvailable)('every question has exactly 4 answers', () => {
-    const qs = parseElwisHtml(binnenHtml, 'binnen');
-    for (const q of qs) expect(q.answers).toHaveLength(4);
-  });
-
-  it.skipIf(() => !fixturesAvailable)('correctIndex is 0 for every question (first answer is correct per ELWIS convention)', () => {
+  it('correctIndex is 0 for every question', () => {
     const qs = parseElwisHtml(binnenHtml, 'binnen');
     for (const q of qs) expect(q.correctIndex).toBe(0);
   });
 
-  it.skipIf(() => !fixturesAvailable)('flags navigation tasks for See 286-300', () => {
-    const qs = parseElwisHtml(seeHtml, 'see');
-    for (const q of qs) {
-      const expected = q.officialNumber >= 286 && q.officialNumber <= 300;
-      expect(q.isNavigationTask).toBe(expected);
-    }
+  it('does not set isNavigationTask (fetcher adds that post-parse)', () => {
+    const qs = parseElwisHtml(binnenHtml, 'binnen');
+    for (const q of qs) expect(q.isNavigationTask).toBe(false);
   });
 
-  it.skipIf(() => !fixturesAvailable)('extracts image URLs when present', () => {
+  it('extracts image URLs when present', () => {
     const qs = parseElwisHtml(binnenHtml, 'binnen');
     const withImages = qs.filter(q => q.imageRef);
     expect(withImages.length).toBeGreaterThan(0);

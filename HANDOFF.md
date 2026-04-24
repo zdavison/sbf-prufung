@@ -35,9 +35,10 @@ Each of these tasks in the plan contains a step that requires the network. In a 
 
 ### Task 2 — ELWIS HTML parser
 
-- **Needs:** `pipeline/__fixtures__/elwis-binnen.html` and `pipeline/__fixtures__/elwis-see.html` already committed.
+- **Needs (SBF-Binnen, confirmed live URLs):** `pipeline/__fixtures__/elwis-basisfragen.html`, `pipeline/__fixtures__/elwis-binnen.html`, `pipeline/__fixtures__/elwis-segeln.html` already committed.
+- **Needs (SBF-See, URLs TBD):** `pipeline/__fixtures__/elwis-see-basisfragen.html`, `pipeline/__fixtures__/elwis-see.html`, `pipeline/__fixtures__/elwis-navigationsaufgaben.html` once the user provides the three `/Fragenkatalog-See/` URLs. The parser and fetcher are structured to absorb them without further changes.
 - **If present:** proceed as written in the plan. The parser is developed TDD against the fixtures; no network needed.
-- **If missing:** stop. Ask the user (outside the sandbox) to capture the two HTML pages from elwis.de and commit them, then resume.
+- **If missing:** stop. Ask the user (outside the sandbox) to capture the HTML pages from elwis.de and commit them, then resume. The SBF-Binnen fixtures alone are sufficient to get Tasks 2 and 3 green — SBF-See can land later.
 
 ### Task 3 — `fetch-elwis.ts` CLI
 
