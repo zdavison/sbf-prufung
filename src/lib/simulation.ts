@@ -10,6 +10,12 @@ export function buildSimulation(exam: Exam): Question[] {
   const all = byExam(exam);
   const basis = all.filter(q => q.exam === 'basis');
   const specific = all.filter(q => q.exam === exam);
+  if (basis.length < SIM_BASIS_COUNT) {
+    throw new Error(`buildSimulation: not enough basis questions (${basis.length} < ${SIM_BASIS_COUNT})`);
+  }
+  if (specific.length < SIM_SPECIFIC_COUNT) {
+    throw new Error(`buildSimulation: not enough ${exam} questions (${specific.length} < ${SIM_SPECIFIC_COUNT})`);
+  }
   return shuffle([
     ...shuffle(basis).slice(0, SIM_BASIS_COUNT),
     ...shuffle(specific).slice(0, SIM_SPECIFIC_COUNT),
