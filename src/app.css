@@ -1,0 +1,14 @@
+:root {
+  --bg: #fafafa;
+  --fg: #111;
+  --accent: #0a66c2;
+  --correct: #2e7d32;
+  --wrong: #c62828;
+  --border: #ddd;
+  --panel: #fff;
+  --gap: 1rem;
+  font-family: system-ui, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+body { margin: 0; }
