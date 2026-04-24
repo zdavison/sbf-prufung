@@ -8,7 +8,7 @@
   }>();
 </script>
 
-<aside class="panel">
+<aside class="panel" lang="en">
   <h3>English</h3>
   {#if !revealed}
     <p class="placeholder">Answer the question to reveal the translation.</p>

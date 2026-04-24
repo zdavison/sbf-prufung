@@ -15,6 +15,7 @@
   let revealed = $state(false);
   let displayOrder = $state<number[]>([0, 1, 2, 3]);
   let answers = $state<Record<string, boolean>>({});
+  // safe: guarded by queue.length > 0 check in template
   const current = $derived(queue[index]!);
 
   function onCardAnswer(outcome: { correct: boolean; displayOrder: number[] }) {
@@ -37,39 +38,44 @@
   }
 </script>
 
-<ProgressBar current={index + 1} total={queue.length} />
-
-{#if current.isNavigationTask}
-  <article class="nav-task">
-    <h2>Frage {current.officialNumber} — Navigationsaufgabe</h2>
-    <p>{current.de.question}</p>
-    {#if current.image}<img src={current.image} alt="Chart {current.officialNumber}" />{/if}
-    <div class="official-answer">
-      <h3>Offizielle Lösung</h3>
-      <p>{current.de.answers[current.correctIndex]}</p>
-    </div>
-    {#if !revealed}
-      <button onclick={onNavAck}>Got it</button>
-    {/if}
-  </article>
-  {#if revealed}
-    <TranslationPanel question={current} revealed={true} displayOrder={[current.correctIndex]} />
-  {/if}
+{#if queue.length === 0}
+  <p>No questions in this queue.</p>
+  <button class="secondary" onclick={onCancel}>Back to menu</button>
 {:else}
-  <div class="split">
-    <QuestionCard question={current} onAnswer={onCardAnswer} />
-    <TranslationPanel question={current} {revealed} {displayOrder} />
+  <ProgressBar current={index + 1} total={queue.length} />
+
+  {#if current.isNavigationTask}
+    <article class="nav-task">
+      <h2>Frage {current.officialNumber} — Navigationsaufgabe</h2>
+      <p>{current.de.question}</p>
+      {#if current.image}<img src={current.image} alt="Chart {current.officialNumber}" />{/if}
+      <div class="official-answer">
+        <h3>Offizielle Lösung</h3>
+        <p>{current.de.answers[current.correctIndex]}</p>
+      </div>
+      {#if !revealed}
+        <button onclick={onNavAck}>Got it</button>
+      {/if}
+    </article>
+    {#if revealed}
+      <TranslationPanel question={current} revealed={true} displayOrder={[current.correctIndex]} />
+    {/if}
+  {:else}
+    <div class="split">
+      <QuestionCard question={current} onAnswer={onCardAnswer} />
+      <TranslationPanel question={current} {revealed} {displayOrder} />
+    </div>
+  {/if}
+
+  <div class="actions">
+    <button class="secondary" onclick={onCancel}>Back to menu</button>
+    {#if revealed}
+      <button class="primary" onclick={next}>
+        {index + 1 >= queue.length ? 'Finish' : 'Next'}
+      </button>
+    {/if}
   </div>
 {/if}
-
-<div class="actions">
-  <button class="secondary" onclick={onCancel}>Back to menu</button>
-  {#if revealed}
-    <button class="primary" onclick={next}>
-      {index + 1 >= queue.length ? 'Finish' : 'Next'}
-    </button>
-  {/if}
-</div>
 
 <style>
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); align-items: start; }

@@ -27,13 +27,14 @@
   {#if view.name === 'home'}
     <Home onStart={start} onWeak={goWeak} />
   {:else if view.name === 'question'}
+    {@const q = view}
     <QuestionView
-      queue={view.queue}
-      mode={view.mode}
-      exam={view.exam}
+      queue={q.queue}
+      mode={q.mode}
+      exam={q.exam}
       onFinish={(answers) =>
-        view.name === 'question' && view.mode === 'simulation'
-          ? goResults(view.queue, answers, view.exam)
+        q.mode === 'simulation'
+          ? goResults(q.queue, answers, q.exam)
           : goHome()}
       onCancel={goHome} />
   {:else if view.name === 'results'}

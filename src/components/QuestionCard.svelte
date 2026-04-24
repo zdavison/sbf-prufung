@@ -7,7 +7,7 @@
     onAnswer: (outcome: { correct: boolean; displayOrder: number[] }) => void;
   }>();
 
-  let displayOrder = $state<number[]>(shuffle([0, 1, 2, 3]));
+  let displayOrder = $state<number[]>([0, 1, 2, 3]);
   let picked = $state<number | null>(null);
 
   $effect(() => {

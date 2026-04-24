@@ -1,15 +1,18 @@
 <script lang="ts">
   import type { Exam, Question } from '../lib/types';
+
+  const PASS_THRESHOLD = 24;
+
   let { queue, answers, exam, onHome } = $props<{
     queue: Question[]; answers: Record<string, boolean>; exam: Exam; onHome: () => void;
   }>();
   const correctCount = $derived(queue.filter((q: Question) => answers[q.id]).length);
-  const passed = $derived(correctCount >= 24);
+  const passed = $derived(correctCount >= PASS_THRESHOLD);
 </script>
 
 <h1>Exam Simulation — {exam.toUpperCase()}</h1>
 <p class="grade" class:pass={passed} class:fail={!passed}>
-  {correctCount} / {queue.length} correct — {passed ? 'Bestanden' : 'Nicht bestanden'}
+  {correctCount} / {queue.length} correct — {passed ? 'Bestanden' : 'Nicht bestanden'} (pass: {PASS_THRESHOLD})
 </p>
 
 <ol class="review">

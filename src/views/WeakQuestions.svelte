@@ -9,11 +9,9 @@
   }>();
 
   const progress = loadProgress();
-  const weakList = $derived(
-    weakQuestions()
-      .map(id => getQuestion(id))
-      .filter((q): q is Question => !!q)
-  );
+  const weakList = weakQuestions()
+    .map(id => getQuestion(id))
+    .filter((q): q is Question => !!q);
 
   function startReview() {
     if (weakList.length === 0) return;
@@ -31,7 +29,7 @@
 {#if weakList.length === 0}
   <p>No weak questions yet. Answer some wrong and come back!</p>
 {:else}
-  <p>{weakList.length} questions where wrong answers outnumber correct ones.</p>
+  <p>{weakList.length} questions with more wrong answers than correct ones.</p>
   <button onclick={startReview}>Review all</button>
   <ol class="list">
     {#each weakList as q}

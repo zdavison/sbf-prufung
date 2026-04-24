@@ -1,8 +1,8 @@
 <script lang="ts">
   let { current, total } = $props<{ current: number; total: number }>();
-  const pct = $derived(Math.round((current / total) * 100));
+  const pct = $derived(total > 0 ? Math.round((current / total) * 100) : 0);
 </script>
-<div class="bar" aria-label="Progress">
+<div class="bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Question {current} of {total}">
   <div class="fill" style="width: {pct}%"></div>
   <span class="text">{current} / {total}</span>
 </div>

@@ -12,6 +12,11 @@
   let exam = $state<Exam>('binnen');
   let category = $state<string>('');
 
+  $effect(() => {
+    exam; // track exam changes
+    category = '';
+  });
+
   const categories = $derived(allCategories(exam));
 
   function startSequential() {
