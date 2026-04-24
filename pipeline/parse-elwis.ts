@@ -35,7 +35,13 @@ export function parseElwisHtml(html: string, exam: Exam): RawQuestion[] {
     const answers = $el.find('li').map((_, li) => $(li).text().trim()).get().filter(Boolean);
     const imgSrc = $el.find('img').attr('src');
 
-    if (!questionText || answers.length !== 4) return;
+    if (!questionText || answers.length !== 4) {
+      process.stderr.write(
+        `parse-elwis: skipping question node officialNumber=${officialNumber} ` +
+        `(${answers.length} answers, questionText="${questionText.slice(0, 40)}")\n`
+      );
+      return;
+    }
 
     const isNavigationTask = exam === 'see' && officialNumber >= 286 && officialNumber <= 300;
 

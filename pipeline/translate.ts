@@ -66,11 +66,14 @@ async function main() {
   const entries = [...todo.entries()];
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
     const batch = entries.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(async ([h, de]) => {
+    const results = await Promise.allSettled(batch.map(async ([h, de]) => {
       const en = await translateOne(client, de);
       return [h, { de, en }] as const;
     }));
-    for (const [h, v] of results) cache[h] = v;
+    for (const r of results) {
+      if (r.status === 'fulfilled') cache[r.value[0]] = r.value[1];
+      else process.stderr.write(`  WARN: translation failed: ${r.reason}\n`);
+    }
     writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2));
     process.stderr.write(`  ${Math.min(i + BATCH_SIZE, entries.length)}/${entries.length}\n`);
   }
