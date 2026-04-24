@@ -1,0 +1,50 @@
+[
+  {
+    "id": "basis-1",
+    "de": {
+      "question": "Was bedeutet das Zeichen \"Einfahrt verboten\"?",
+      "answers": [
+        "Das Befahren der Wasserstraße ist verboten.",
+        "Es darf nur mit Sondererlaubnis eingefahren werden.",
+        "Die Wasserstraße ist gesperrt.",
+        "Nur Motorboote dürfen einfahren."
+      ]
+    }
+  },
+  {
+    "id": "basis-2",
+    "de": {
+      "question": "Was versteht man unter Backbord?",
+      "answers": [
+        "Die linke Seite des Fahrzeugs in Fahrtrichtung.",
+        "Die rechte Seite des Fahrzeugs in Fahrtrichtung.",
+        "Das Heck des Fahrzeugs.",
+        "Den Bug des Fahrzeugs."
+      ]
+    }
+  },
+  {
+    "id": "binnen-73",
+    "de": {
+      "question": "Was bedeutet ein langer Ton als Schallsignal?",
+      "answers": [
+        "Ein Ton von 4 bis 6 Sekunden Dauer.",
+        "Ein Ton von 1 bis 2 Sekunden Dauer.",
+        "Ein Ton von mehr als 6 Sekunden Dauer.",
+        "Ein Ton von weniger als 1 Sekunde Dauer."
+      ]
+    }
+  },
+  {
+    "id": "see-73",
+    "de": {
+      "question": "Welche Lichter führt ein Segelfahrzeug unter 7 m Länge bei Nacht?",
+      "answers": [
+        "Eine elektrische Laterne mit weißem, grünem und rotem Licht.",
+        "Nur ein weißes Rundumlicht.",
+        "Toplicht und Seitenlichter.",
+        "Topplicht, Seitenlichter und Hecklicht."
+      ]
+    }
+  }
+]
