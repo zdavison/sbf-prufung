@@ -5,7 +5,7 @@
 // @connect      raw.githubusercontent.com
 // @grant        GM_xmlhttpRequest
 // @run-at       document-idle
-// @version      0.2.0
+// @version      0.3.0
 // @description  Hover translations for SBF quiz questions, sourced from ELWIS data.
 // ==/UserScript==
 
@@ -65,24 +65,19 @@
     const direct = map.get(normText);
     if (direct) return direct;
     const len = normText.length;
-    let best = null, bestScore = 0, bestKey = null;
+    let best = null, bestScore = 0;
     for (const [key, value] of map) {
       const keyLen = key.length;
       if (Math.abs(keyLen - len) / Math.max(keyLen, len) > LENGTH_DIFF_CUTOFF) continue;
       const j = jaccard(normText, key);
-      if (j >= JACCARD_THRESHOLD && j > bestScore) {
-        best = value; bestScore = j; bestKey = key;
-      }
+      if (j >= JACCARD_THRESHOLD && j > bestScore) { best = value; bestScore = j; }
     }
     if (best) return best;
-    // Levenshtein fallback over length-compatible entries
     for (const [key, value] of map) {
       const keyLen = key.length;
       if (Math.abs(keyLen - len) / Math.max(keyLen, len) > LENGTH_DIFF_CUTOFF) continue;
       const r = 1 - levenshtein(normText, key) / Math.max(keyLen, len);
-      if (r >= LEVENSHTEIN_THRESHOLD && r > bestScore) {
-        best = value; bestScore = r; bestKey = key;
-      }
+      if (r >= LEVENSHTEIN_THRESHOLD && r > bestScore) { best = value; bestScore = r; }
     }
     return best;
   }
@@ -142,27 +137,10 @@
     return dataPromise;
   }
 
-  // ---- Element targeting on hover ----
-
-  // Walk up from target to find the nearest ancestor whose trimmed text is a
-  // plausible question/answer (length in range and not gigantic wrappers).
-  function findCandidate(start) {
-    let el = start;
-    while (el && el !== document.body && el instanceof Element) {
-      if (tooltipEl && (el === tooltipEl || tooltipEl.contains(el))) return null;
-      const text = el.textContent ? el.textContent.trim() : '';
-      if (text.length >= MIN_TEXT_LEN && text.length <= MAX_TEXT_LEN) return el;
-      if (text.length > MAX_TEXT_LEN) return null; // went past — ancestor is a big container
-      el = el.parentElement;
-    }
-    return null;
-  }
-
-  const lookupCache = new WeakMap(); // Element -> string | null
-
   // ---- Tooltip ----
 
   let tooltipEl = null;
+  let tooltipAnchor = null;
 
   function ensureTooltip() {
     if (tooltipEl) return tooltipEl;
@@ -210,57 +188,85 @@
 
   function hideTooltip() {
     if (tooltipEl) tooltipEl.style.display = 'none';
+    tooltipAnchor = null;
   }
 
-  // ---- Hover state machine ----
+  // ---- Debounced hover state ----
 
-  let hoveredEl = null;
-  let hoverTimer = null;
+  // Mouse events are kept trivially cheap: update last position/target and
+  // reset a single timer. All DOM inspection and translation lookup only
+  // happen once the mouse has been stationary for HOVER_DELAY_MS.
+
+  let lastTarget = null;
   let lastX = 0, lastY = 0;
+  let hoverTimer = null;
 
-  function onMouseOver(e) {
-    const candidate = findCandidate(e.target);
-    if (!candidate) return;
-    if (candidate === hoveredEl) return;
-    hoveredEl = candidate;
-    clearTimeout(hoverTimer);
-    hideTooltip();
-    lastX = e.clientX; lastY = e.clientY;
-    hoverTimer = setTimeout(async () => {
-      if (hoveredEl !== candidate) return;
-      let translation = lookupCache.get(candidate);
-      if (translation === undefined) {
-        try {
-          const maps = await getMaps();
-          translation = lookup(candidate.textContent, maps) || null;
-        } catch {
-          translation = null;
-        }
-        lookupCache.set(candidate, translation);
+  const lookupCache = new WeakMap();
+
+  function findCandidate(start) {
+    let el = start;
+    while (el && el !== document.body && el instanceof Element) {
+      if (tooltipEl && (el === tooltipEl || tooltipEl.contains(el))) return null;
+      const text = el.textContent;
+      const len = text ? text.length : 0;
+      if (len > MAX_TEXT_LEN) return null;
+      if (len >= MIN_TEXT_LEN) {
+        const trimmed = text.trim();
+        if (trimmed.length >= MIN_TEXT_LEN && trimmed.length <= MAX_TEXT_LEN) return el;
       }
-      if (translation && hoveredEl === candidate) {
-        showTooltip(translation, lastX, lastY);
-      }
-    }, HOVER_DELAY_MS);
+      el = el.parentElement;
+    }
+    return null;
   }
 
-  function onMouseOut(e) {
-    // relatedTarget is the element the pointer moved INTO; if it's still
-    // inside the current candidate, ignore (mouseout bubbles from children).
-    if (hoveredEl && e.relatedTarget instanceof Node && hoveredEl.contains(e.relatedTarget)) return;
-    hoveredEl = null;
-    clearTimeout(hoverTimer);
-    hideTooltip();
+  async function onHoverSettle() {
+    const target = lastTarget;
+    if (!target || !(target instanceof Element) || !target.isConnected) return;
+    if (tooltipEl && tooltipEl.contains(target)) return;
+
+    const candidate = findCandidate(target);
+    if (!candidate) return;
+
+    let translation = lookupCache.get(candidate);
+    if (translation === undefined) {
+      try {
+        const maps = await getMaps();
+        translation = lookup(candidate.textContent, maps) || null;
+      } catch {
+        translation = null;
+      }
+      lookupCache.set(candidate, translation);
+    }
+
+    // Confirm the mouse hasn't moved off this candidate during the async work.
+    if (!translation) return;
+    if (!(lastTarget instanceof Node) || !candidate.contains(lastTarget)) return;
+
+    tooltipAnchor = candidate;
+    showTooltip(translation, lastX, lastY);
   }
 
   function onMouseMove(e) {
+    lastTarget = e.target;
     lastX = e.clientX; lastY = e.clientY;
+
     if (tooltipEl && tooltipEl.style.display === 'block') {
-      positionTooltip(lastX, lastY);
+      if (tooltipAnchor && tooltipAnchor.contains(e.target)) {
+        positionTooltip(lastX, lastY);
+      } else {
+        hideTooltip();
+      }
     }
+
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(onHoverSettle, HOVER_DELAY_MS);
   }
 
-  document.addEventListener('mouseover', onMouseOver, true);
-  document.addEventListener('mouseout', onMouseOut, true);
-  document.addEventListener('mousemove', onMouseMove, true);
+  function onMouseLeave() {
+    clearTimeout(hoverTimer);
+    hideTooltip();
+  }
+
+  document.addEventListener('mousemove', onMouseMove, { passive: true });
+  document.addEventListener('mouseleave', onMouseLeave, { passive: true });
 })();
