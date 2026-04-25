@@ -26,18 +26,19 @@ describe.skipIf(!fixturesAvailable)('parseElwisHtml', () => {
     expect(qs.at(-1)!.officialNumber).toBe(253);
   });
 
-  it('returns 47 questions numbered 254..300 for the Segeln sub-page (tagged as binnen)', () => {
-    const qs = parseElwisHtml(segelnHtml, 'binnen');
+  it('returns 47 questions numbered 254..300 for the Segeln sub-page (tagged as segeln)', () => {
+    const qs = parseElwisHtml(segelnHtml, 'segeln');
     expect(qs).toHaveLength(47);
     expect(qs[0]!.officialNumber).toBe(254);
     expect(qs.at(-1)!.officialNumber).toBe(300);
+    for (const q of qs) expect(q.exam).toBe('segeln');
   });
 
   it('every question has exactly 4 answers', () => {
     for (const qs of [
       parseElwisHtml(basisHtml, 'basis'),
       parseElwisHtml(binnenHtml, 'binnen'),
-      parseElwisHtml(segelnHtml, 'binnen'),
+      parseElwisHtml(segelnHtml, 'segeln'),
     ]) {
       for (const q of qs) expect(q.answers).toHaveLength(4);
     }

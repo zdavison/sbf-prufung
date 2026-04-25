@@ -61,7 +61,12 @@
   function goWeak() { view = { name: 'weak' }; }
 </script>
 
-<main>
+<main class="shell">
+  <header class="shell-header">
+    <h1>SBF Prüfung</h1>
+    <span class="subtitle">Binnen · Fragenkatalog 2023</span>
+  </header>
+
   {#if view.name === 'home'}
     <Home onStart={start} onWeak={goWeak} />
   {:else if view.name === 'question'}
@@ -84,7 +89,3 @@
     <WeakQuestions onStart={start} onBack={goHome} />
   {/if}
 </main>
-
-<style>
-  main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
-</style>

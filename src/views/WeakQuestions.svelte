@@ -25,29 +25,55 @@
   }
 </script>
 
-<h1>Weak questions</h1>
-{#if weakList.length === 0}
-  <p>No weak questions yet. Answer some wrong and come back!</p>
-{:else}
-  <p>{weakList.length} questions with more wrong answers than correct ones.</p>
-  <button onclick={startReview}>Review all</button>
+<div class="card hatch-shadow">
+  <h2 class="card-title">Schwache Fragen</h2>
+  {#if weakList.length === 0}
+    <p class="muted small" style="margin: 0 0 0.75rem;">Noch keine. Beantworte Fragen falsch und komm wieder.</p>
+  {:else}
+    <div class="row between" style="margin-bottom: 0.9rem;">
+      <span class="muted small">{weakList.length} Fragen · |falsch| &gt; |richtig|</span>
+      <button onclick={startReview}>Alle wiederholen</button>
+    </div>
+  {/if}
+</div>
+
+{#if weakList.length > 0}
   <ol class="list">
     {#each weakList as q}
       {@const p = progress[q.id]}
       <li>
-        <span class="id">{q.id}</span>
-        <span class="q">{q.de.question}</span>
-        <span class="stats">✓ {p?.correct ?? 0} · ✗ {p?.wrong ?? 0}</span>
+        <span class="badge badge-soft mono">{q.id}</span>
+        <span class="qtext">{q.de.question}</span>
+        <span class="stats mono">
+          <span class="ok">✓{p?.correct ?? 0}</span>
+          <span class="sep">·</span>
+          <span class="bad">✗{p?.wrong ?? 0}</span>
+        </span>
       </li>
     {/each}
   </ol>
 {/if}
-<button class="secondary" onclick={onBack}>Back</button>
+
+<div class="row" style="margin-top: 1.25rem;">
+  <button class="ghost" onclick={onBack}>← Zurück</button>
+</div>
 
 <style>
-  .list { list-style: none; padding: 0; }
-  .list li { display: grid; grid-template-columns: 7rem 1fr 7rem; gap: 0.5rem; padding: 0.5rem; border-bottom: 1px solid var(--border); }
-  .stats { color: #666; font-variant-numeric: tabular-nums; text-align: right; }
-  button { padding: 0.6rem 1.2rem; background: var(--accent); color: #fff; border: 0; border-radius: 3px; cursor: pointer; margin-right: 0.5rem; }
-  button.secondary { background: transparent; color: inherit; border: 1px solid var(--border); }
+  .list { list-style: none; padding: 0; margin: 0; }
+  .list li {
+    display: grid;
+    grid-template-columns: 7rem 1fr 5.5rem;
+    gap: 0.75rem;
+    padding: 0.5rem 0.25rem;
+    border-bottom: 1px solid oklch(var(--s) / 0.2);
+    align-items: center;
+    font-size: 0.88rem;
+    line-height: 1.4;
+  }
+  .list li:last-child { border-bottom: 0; }
+  .qtext { line-height: 1.4; }
+  .stats { text-align: right; font-size: 0.78rem; display: inline-flex; gap: 0.3rem; justify-content: flex-end; }
+  .stats .ok { color: oklch(var(--c-correct)); }
+  .stats .bad { color: oklch(var(--c-wrong)); }
+  .stats .sep { color: oklch(var(--bc2)); }
 </style>

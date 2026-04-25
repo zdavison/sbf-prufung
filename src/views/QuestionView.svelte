@@ -91,22 +91,54 @@
   {/if}
 
   <div class="actions">
-    <button class="secondary" onclick={onCancel}>Back to menu</button>
+    <button class="ghost" onclick={onCancel}>← Zurück</button>
     {#if revealed}
-      <button class="primary" onclick={next}>
-        {index + 1 >= queue.length ? 'Finish' : 'Next'}
+      <button onclick={next}>
+        {index + 1 >= queue.length ? 'Fertig' : 'Weiter →'}
       </button>
     {/if}
   </div>
 {/if}
 
 <style>
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); align-items: start; }
-  .nav-task { background: var(--panel); border: 1px solid var(--border); padding: 1.25rem; border-radius: 4px; }
-  .nav-task img { max-width: 100%; margin: 1rem 0; }
-  .official-answer { margin-top: 1rem; padding: 0.75rem 1rem; background: #f3f8f4; border-left: 3px solid var(--correct); }
-  .actions { display: flex; justify-content: space-between; margin-top: var(--gap); }
-  button { padding: 0.6rem 1.2rem; border-radius: 3px; border: 0; cursor: pointer; font: inherit; }
-  button.primary { background: var(--accent); color: #fff; }
-  button.secondary { background: transparent; border: 1px solid var(--border); }
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    .split { grid-template-columns: 1fr; }
+  }
+  .nav-task {
+    background: oklch(var(--b1));
+    border: 1px solid oklch(var(--s) / 0.3);
+    padding: 1.25rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+  }
+  .nav-task img { max-width: 100%; margin: 1rem 0; border: 1px solid oklch(var(--s) / 0.3); border-radius: 0.2rem; }
+  .official-answer {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: oklch(var(--c-correct) / 0.08);
+    border-left: 3px solid oklch(var(--c-correct));
+    border-radius: 0 0.2rem 0.2rem 0;
+    font-size: 0.9rem;
+  }
+  .official-answer h3 {
+    margin: 0 0 0.35rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: oklch(var(--c-correct));
+    font-weight: 800;
+  }
+  .official-answer p { margin: 0; }
+  .actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.25rem;
+    gap: 0.6rem;
+  }
 </style>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Exam, Mode, Question } from '../lib/types';
-  import { byExam, allCategories, getQuestion } from '../lib/data';
+  import { byExam, allCategories, getQuestion, hasExam } from '../lib/data';
   import { shuffle } from '../lib/shuffle';
   import { buildSimulation } from '../lib/simulation';
   import { getLastWrong, resetLastWrong, lastWrongKey } from '../lib/progress';
@@ -10,14 +10,18 @@
     onWeak: () => void;
   }>();
 
-  let exam = $state<Exam>('binnen');
+  // Hide exams the dataset doesn't include yet (SBF-See is wired in the type system
+  // but absent from data/questions.json). If only one exam is present the picker
+  // collapses to a static label.
+  const EXAM_LABELS: Record<Exam, string> = { binnen: 'SBF-Binnen', see: 'SBF-See' };
+  const availableExams: Exam[] = (['binnen', 'see'] as const).filter(hasExam);
+
+  let exam = $state<Exam>(availableExams[0] ?? 'binnen');
   let category = $state<string>('');
-  // A bump forces wrongIdsForCategory to re-read localStorage after we mutate it
-  // here (exam/category alone don't change on reset).
   let readTick = $state(0);
 
   $effect(() => {
-    exam; // track exam changes
+    exam;
     category = '';
   });
 
@@ -26,6 +30,7 @@
     readTick;
     return category ? getLastWrong(lastWrongKey(exam, category)) : [];
   });
+  const totalForExam = $derived(byExam(exam).length);
 
   function startSequential() {
     const queue = category
@@ -42,8 +47,6 @@
     const queue = wrongIdsForCategory
       .map(id => getQuestion(id))
       .filter((q): q is Question => !!q);
-    // The redo run itself resets the bucket so the user can iteratively narrow
-    // down on the stubborn ones.
     resetLastWrong(lastWrongKey(exam, category));
     readTick++;
     onStart(exam, 'sequential', queue, category);
@@ -52,76 +55,66 @@
   function startSimulation() { onStart(exam, 'simulation', buildSimulation(exam)); }
 </script>
 
-<h1>SBF Prüfung Trainer</h1>
+<div class="card hatch-shadow">
+  <h2 class="card-title">Prüfung</h2>
+  <div class="row between">
+    {#if availableExams.length > 1}
+      <label class="inline">
+        <span>Exam</span>
+        <select bind:value={exam}>
+          {#each availableExams as e}
+            <option value={e}>{EXAM_LABELS[e]}</option>
+          {/each}
+        </select>
+      </label>
+    {:else}
+      <span class="badge">{EXAM_LABELS[exam]}</span>
+    {/if}
+    <span class="muted small mono">{totalForExam} Fragen</span>
+  </div>
+</div>
 
-<section class="panel">
+<div class="card hatch-shadow">
+  <h2 class="card-title">Nach Kategorie</h2>
   <label>
-    Exam:
-    <select bind:value={exam}>
-      <option value="binnen">SBF-Binnen</option>
-      <option value="see">SBF-See</option>
-    </select>
-  </label>
-</section>
-
-<section class="panel">
-  <h2>Sequential by category</h2>
-  <label>
-    Category:
+    <span>Kategorie</span>
     <select bind:value={category}>
-      <option value="">— all categories —</option>
+      <option value="">— alle Kategorien —</option>
       {#each categories as c}
         <option value={c}>{c}</option>
       {/each}
     </select>
   </label>
-  <div class="row">
+  <div class="row" style="margin-top: 0.9rem;">
     <button onclick={startSequential}>Start</button>
     {#if category && wrongIdsForCategory.length > 0}
       <button class="secondary" onclick={startRedoWrong}>
-        Redo {wrongIdsForCategory.length} wrong from last run
+        Redo {wrongIdsForCategory.length} Falsch
       </button>
     {/if}
   </div>
-</section>
+</div>
 
-<section class="panel">
-  <h2>Shuffle whole exam</h2>
+<div class="card hatch-shadow">
+  <h2 class="card-title">Gemischt</h2>
+  <p class="muted small" style="margin: 0 0 0.9rem;">Alle {totalForExam} Fragen in zufälliger Reihenfolge.</p>
   <button onclick={startShuffle}>Start</button>
-</section>
+</div>
 
-<section class="panel">
-  <h2>Exam simulation (30 random)</h2>
+<div class="card hatch-shadow">
+  <h2 class="card-title">Prüfungssimulation</h2>
+  <p class="muted small" style="margin: 0 0 0.9rem;">30 zufällige Fragen · 7 Basis + 23 spezifisch · Bestehensgrenze 24/30.</p>
   <button onclick={startSimulation}>Start</button>
-</section>
+</div>
 
-<section class="panel">
-  <h2>Review weak questions</h2>
-  <button onclick={onWeak}>Open</button>
-</section>
+<div class="card hatch-shadow">
+  <h2 class="card-title">Schwache Fragen</h2>
+  <p class="muted small" style="margin: 0 0 0.9rem;">Alle Fragen, bei denen ∣falsch∣ &gt; ∣richtig∣ über deine gesamte Übung.</p>
+  <button class="secondary" onclick={onWeak}>Öffnen</button>
+</div>
 
 <style>
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    padding: 1rem 1.25rem;
-    margin-bottom: 1rem;
-    border-radius: 4px;
-  }
-  button {
-    background: var(--accent);
-    color: white;
-    border: 0;
-    padding: 0.5rem 1rem;
-    border-radius: 3px;
-    cursor: pointer;
-    margin-top: 0.75rem;
-  }
-  label { display: block; margin-bottom: 0.5rem; }
-  .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-  button.secondary {
-    background: transparent;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-  }
+  label.inline { display: inline-flex; flex-direction: column; gap: 0.3rem; margin: 0; }
+  label.inline > span:first-child { margin-bottom: 0; }
+  label > span:first-child { display: block; margin-bottom: 0.35rem; }
 </style>

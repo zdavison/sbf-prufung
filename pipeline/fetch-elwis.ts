@@ -11,7 +11,7 @@ export const SOURCES: SubPage[] = [
   // SBF-Binnen (300 Qs = 72 basis + 181 binnen + 47 segeln)
   { url: `${BASE}/Fragenkatalog-Binnen/Basisfragen/Basisfragen-node.html`, exam: 'basis', label: 'SBF-Binnen basisfragen' },
   { url: `${BASE}/Fragenkatalog-Binnen/Spezifische-Fragen-Binnen/Spezifische-Fragen-Binnen-node.html`, exam: 'binnen', label: 'SBF-Binnen binnen-specific' },
-  { url: `${BASE}/Fragenkatalog-Binnen/Spezifische-Fragen-Segeln/Spezifische-Fragen-Segeln-node.html`, exam: 'binnen', label: 'SBF-Binnen segeln (254-300)' },
+  { url: `${BASE}/Fragenkatalog-Binnen/Spezifische-Fragen-Segeln/Spezifische-Fragen-Segeln-node.html`, exam: 'segeln', label: 'SBF-Binnen segeln (254-300)' },
 
   // SBF-See (300 Qs = 72 + 213 + 15). URLs TBD — user to confirm the /Fragenkatalog-See/ paths.
   // { url: `${BASE}/Fragenkatalog-See/Basisfragen/Basisfragen-node.html`, exam: 'basis', label: 'SBF-See basisfragen' },

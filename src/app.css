@@ -1,14 +1,293 @@
+/* Palette — loosely mirrors DaisyUI "lofi": warm off-white base with near-black
+   text, a muted dark tone (--s) driving the hatch-shadow motif, and minimal
+   hue. Oklch keeps tones consistent under alpha. */
 :root {
-  --bg: #fafafa;
-  --fg: #111;
-  --accent: #0a66c2;
-  --correct: #2e7d32;
-  --wrong: #c62828;
-  --border: #ddd;
-  --panel: #fff;
+  --b1: 0.99 0.002 80;
+  --b2: 0.96 0.004 80;
+  --bc: 0.18 0.01 60;
+  --bc2: 0.35 0.01 60;
+  --s: 0.32 0.02 60;
+  --p: 0.22 0.02 255;
+  --c-correct: 0.55 0.14 150;
+  --c-wrong: 0.55 0.18 25;
+
+  /* Legacy aliases used by older component styles until they migrate. */
+  --bg: oklch(var(--b1));
+  --fg: oklch(var(--bc));
+  --accent: oklch(var(--p));
+  --correct: oklch(var(--c-correct));
+  --wrong: oklch(var(--c-wrong));
+  --border: oklch(var(--s) / 0.3);
+  --panel: oklch(var(--b1));
   --gap: 1rem;
-  font-family: system-ui, sans-serif;
-  color: var(--fg);
-  background: var(--bg);
+
+  color: oklch(var(--bc));
+  background: oklch(var(--b1));
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
-body { margin: 0; }
+
+html,
+body {
+  margin: 0;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100vh;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.mono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Layout shell */
+.shell {
+  max-width: 48rem;
+  width: 95vw;
+  margin: 0 auto;
+  padding: 1.5rem 0 4rem;
+}
+
+.shell-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.5rem 0 1rem;
+  border-bottom: 1px solid oklch(var(--s) / 0.4);
+  margin-bottom: 1.75rem;
+}
+
+.shell-header h1 {
+  margin: 0;
+  font-weight: 800;
+  font-size: 2rem;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.shell-header .subtitle {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: oklch(var(--bc2));
+  letter-spacing: 0.02em;
+}
+
+/* Card with the signature hatched drop shadow. */
+.card {
+  position: relative;
+  background: oklch(var(--b1));
+  border: 1px solid oklch(var(--s) / 0.3);
+  border-radius: 0.25rem;
+  padding: 1.1rem 1.2rem 1rem;
+  margin: 0 0 1.5rem;
+  transition: border-color 0.15s ease;
+}
+
+.card:hover {
+  border-color: oklch(var(--s) / 0.7);
+}
+
+.hatch-shadow::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    oklch(var(--s)) 0px,
+    oklch(var(--s)) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  border-radius: inherit;
+  opacity: 0.3;
+  transition: top 0.15s ease, left 0.15s ease;
+}
+
+.hatch-shadow:hover::after {
+  top: 6px;
+  left: 6px;
+}
+
+.card-title {
+  margin: 0 0 0.75rem;
+  font-weight: 800;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: oklch(var(--bc));
+}
+
+/* Badge — compact chip with an offset solid shadow. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  background: oklch(var(--b1));
+  border: 1px solid oklch(var(--s));
+  border-radius: 0.2rem;
+  box-shadow: 1px 1px 0 oklch(var(--s));
+  color: oklch(var(--bc));
+  white-space: nowrap;
+}
+
+.badge-soft {
+  border-color: oklch(var(--s) / 0.5);
+  box-shadow: 1px 1px 0 oklch(var(--s) / 0.5);
+}
+
+.badge-correct {
+  border-color: oklch(var(--c-correct));
+  box-shadow: 1px 1px 0 oklch(var(--c-correct));
+  color: oklch(var(--c-correct));
+}
+
+.badge-wrong {
+  border-color: oklch(var(--c-wrong));
+  box-shadow: 1px 1px 0 oklch(var(--c-wrong));
+  color: oklch(var(--c-wrong));
+}
+
+/* Buttons */
+button,
+.btn {
+  font: inherit;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.75rem;
+  padding: 0.5rem 0.95rem;
+  background: oklch(var(--bc));
+  color: oklch(var(--b1));
+  border: 1px solid oklch(var(--bc));
+  border-radius: 0.2rem;
+  box-shadow: 2px 2px 0 oklch(var(--s));
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+button:hover,
+.btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 oklch(var(--s));
+}
+
+button:active,
+.btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0 0 0 oklch(var(--s));
+}
+
+button:disabled,
+.btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+  transform: none;
+  box-shadow: 1px 1px 0 oklch(var(--s) / 0.3);
+}
+
+button.secondary,
+.btn-secondary {
+  background: oklch(var(--b1));
+  color: oklch(var(--bc));
+  border-color: oklch(var(--s));
+}
+
+button.secondary:hover,
+.btn-secondary:hover {
+  background: oklch(var(--b2));
+}
+
+button.ghost {
+  background: transparent;
+  color: oklch(var(--bc2));
+  border-color: transparent;
+  box-shadow: none;
+  padding: 0.4rem 0.6rem;
+  letter-spacing: 0.02em;
+}
+
+button.ghost:hover {
+  background: oklch(var(--s) / 0.08);
+  transform: none;
+  box-shadow: none;
+  color: oklch(var(--bc));
+}
+
+/* Form controls */
+select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.65rem;
+  background: oklch(var(--b1));
+  color: oklch(var(--bc));
+  border: 1px solid oklch(var(--s) / 0.5);
+  border-radius: 0.2rem;
+  box-shadow: 1px 1px 0 oklch(var(--s) / 0.4);
+  cursor: pointer;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+select:hover {
+  border-color: oklch(var(--s));
+}
+
+select:focus {
+  outline: none;
+  border-color: oklch(var(--s));
+  box-shadow: 1px 1px 0 oklch(var(--s));
+}
+
+label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(var(--bc2));
+  margin-bottom: 0.4rem;
+}
+
+/* Row / stack helpers */
+.row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.row.right {
+  justify-content: flex-end;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.muted {
+  color: oklch(var(--bc2));
+}
+
+.small {
+  font-size: 0.8rem;
+}

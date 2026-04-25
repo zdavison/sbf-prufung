@@ -30,3 +30,10 @@ export function getQuestion(id: string): Question | undefined {
 export function allQuestions(): Question[] {
   return all;
 }
+
+// Graceful degradation: true only if the dataset contains exam-specific questions
+// for this exam (basis questions alone don't count — the Home picker uses this
+// to hide exams whose catalog hasn't landed yet).
+export function hasExam(exam: Exam): boolean {
+  return all.some(q => q.exam === exam);
+}

@@ -1,4 +1,7 @@
-export type Exam = 'binnen' | 'see' | 'basis';
+// Note: 'segeln' is the SBF-Binnen sailing variant (officialNumber 254-300). It's
+// a question tag, not a separately-pickable exam — Sailing is a sub-license of
+// SBF-Binnen on ELWIS but the user-facing app surfaces only the motor variant.
+export type Exam = 'binnen' | 'see' | 'basis' | 'segeln';
 
 export type RawQuestion = {
   exam: Exam;

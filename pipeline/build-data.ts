@@ -52,7 +52,7 @@ export function buildQuestions(raw: RawQuestion[], cache: Cache, overrides: Over
     });
   }
   return [...byId.values()].sort((a, b) => {
-    const order = { basis: 0, binnen: 1, see: 2 };
+    const order = { basis: 0, binnen: 1, segeln: 2, see: 3 };
     return (order[a.exam] - order[b.exam]) || (a.officialNumber - b.officialNumber);
   });
 }
