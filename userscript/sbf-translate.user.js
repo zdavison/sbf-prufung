@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         SBF Translator
 // @namespace    https://github.com/zdavison/sbf-prufung
-// @match        https://www.bootspruefung.de/quiz/*
+// @match        https://www.bootspruefung.de/*
 // @connect      raw.githubusercontent.com
 // @grant        GM_xmlhttpRequest
 // @run-at       document-idle
-// @version      0.3.0
+// @version      0.4.0
 // @description  Hover translations for SBF quiz questions, sourced from ELWIS data.
+// @updateURL    https://raw.githubusercontent.com/zdavison/sbf-prufung/main/userscript/sbf-translate.user.js
+// @downloadURL  https://raw.githubusercontent.com/zdavison/sbf-prufung/main/userscript/sbf-translate.user.js
 // ==/UserScript==
 
 (function () {
